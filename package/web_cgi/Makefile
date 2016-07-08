@@ -15,7 +15,7 @@ define Package/web_cgi
   SECTION:=net
   CATEGORY:=Base system
   TITLE:=cgi program for web interface
-  DEPENDS:= +libuci +libiw +udev +libwifi_uart
+  DEPENDS:= +libuci +libiw +udev +libwifi_uart +libm +libnl-tiny +libiw_nl80211
   
 endef
 
@@ -28,8 +28,10 @@ define Build/Prepare
 	$(CP) ./src/* $(PKG_BUILD_DIR)/
 endef
 
-TARGET_CFLAGS += -I$(STAGING_DIR)/usr/include -I$(KERNEL_BUILD_DIR) -I$(KERNEL_BUILD_DIR)/include
-TARGET_LDFLAGS += -L$(STAGING_DIR)/usr/lib
+TARGET_CFLAGS += -I$(STAGING_DIR)/usr/include -I$(KERNEL_BUILD_DIR) -I$(KERNEL_BUILD_DIR)/include 
+TARGET_LDFLAGS += -L$(STAGING_DIR)/usr/lib -L$(BUILD_DIR_TOOLCHAIN)/uClibc-0.9.33.2/lib
+
+TARGET_CFLAGS += -Wl,--gc-sections
 
 define Build/Compile
 	$(MAKE) -C $(PKG_BUILD_DIR) \
@@ -68,6 +70,13 @@ define Package/web_cgi/install
 #	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ctl_wifi_for_3_0 $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/auto_connect $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mp_disk $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/save_wifi $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/nvram_cfg $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/erase_boot_flag $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/set_wifimode_to_boot $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/sys_upgrade $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/set_sys_flag $(1)/usr/sbin/
+
 	$(INSTALL_BIN) ./nrender/config_nrender $(1)/bin/
 	$(INSTALL_BIN) ./nrender/restore_factory_from_cfg $(1)/bin/
 	$(INSTALL_BIN) ./nrender/restore_single_param $(1)/bin/

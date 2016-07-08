@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <stdio.h> 
 
+#undef WIFI_DRIVER_WEXT
+#define WIFI_DRIVER_NL80211
+
 #define IW_SCAN_HACK		0x8000
 
 #define WPA2_FLAG 0x01
@@ -35,6 +38,23 @@ typedef struct iwscan_state
   int			val_index;	/* Value in table 0->(N-1) */
 } iwscan_state;
 
+typedef struct ap_info{
+	char ssid[32];				/* ssid name */
+	int ssid_len;				/* ssid length */
+	char mac[32];				/* mac */
+	int channel;				/* channel */
+	char encrypt[32];			/* encryption method */
+	char tkip_aes[16];			/* encryption algorithm */
+	int wifi_signal;			/* ap signal */
+	int record;					/* 0:no record;1:has record */
+	char password[64];			/* record ap password */
+}ap_info_t;
+
+typedef struct ap_list_info{    
+	int count;					/* the count of ap */
+	char fre[8];				/* 2.4G or 5G */
+	ap_info_t ap_info[100];		/* ap list */
+}ap_list_info_t;
 
 extern int cgi_get_channel(char *ifname, char *chstr);
 extern  char* xmlEncode(char *string);

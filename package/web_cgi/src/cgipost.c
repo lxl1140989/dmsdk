@@ -45,7 +45,7 @@ void postStr(char *relstr, int sorg,int flag)
 		strcat(sendstr, "</");
 		strcat(sendstr, GETSYSSTR);
 		strcat(sendstr, ">");
-		printf("HTTP/1.1 200 OK\r\n");		
+		// printf("HTTP/1.1 200 OK\r\n");		
 	}
 
 

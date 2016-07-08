@@ -12,6 +12,8 @@ extern char *get_conf_str(char *var);
 #define get_power_level_num  1
 #define get_Firmware_Edition 5
 #define rtl_encryp_control "/proc/rtl_encryp_control"
+#define FILENAME_MAX 2048
+#define DM_CONF_FILE "/usr/mips/conf/dm_router.conf"
 int error_num=0;
 char error_info[1024]="\0";
 
@@ -157,11 +159,17 @@ char *xmldecode(char *xml)
 		int f;
 		char tmp[10];
 		
-		i = strlen(xml);
+		i = strlen(xml)+1;
 		ret = (char *)malloc(i);
+		if(ret == NULL)
+		{	
+			cgi_log("xmldecode malloc fail \r\n");
+			exit(1);
+		}
+		memset(ret,0,i);
 		
 		k=0;
-		for(j=0; j<i;)
+		for(j=0; j<i-1;)
 		{
 				if(xml[j] != '&')
 				{
@@ -587,7 +595,7 @@ int getRemoteAP(xmlNodePtr tag, char *retstr)
 	}
 	else
 		NULL;
-	strcpy(ifname,"wlan1");
+	strcpy(ifname,"wlan0");
 	cgi_get_channel(ifname, channel);  //channel
 	strcpy(uci_option_str,"wireless.@wifi-iface[1].key");  //password
 	uci_get_option_value(uci_option_str,password);
@@ -860,16 +868,81 @@ int getWebDAV(xmlNodePtr tag, char *retstr)
 	return 0;
 }
 
-
+#define BUF_LEN 8192
 int getScan(xmlNodePtr tag, char *retstr)
 {
 	char mode[3]="\0";
 	char wlan1_disabled[3]="\0";
 	char uci_option_str[64]="\0";
+	char wifi_module[16]={0};
 	//xmlDoc		   *doc = NULL;
 	//xmlNodePtr     curNode;
 	//xmlNodePtr	   rootnode;
+	p_debug("access getScan");
+    ctx=uci_alloc_context();
+	if(NULL == ctx)
+		return ;
+	uci_set_confdir(ctx,"/factory/");
 	
+	strcpy(uci_option_str,"factoryconfig.@save[0].wifi_module"); 
+	uci_get_option_value(uci_option_str,wifi_module);
+	memset(uci_option_str,'\0',64);
+	uci_free_context(ctx);
+	if(!strcmp(wifi_module,"AP6181"))
+		{
+		system("iw wlan0 scan | sed -e 's#(on wlan0# (on wlan0#g' | awk -f /etc/iwscan.awk >/tmp/aplist.txt");
+		//sleep(1);
+		
+		do
+		{
+			usleep(100000);//100ms
+		}while(access("/tmp/scan.done",F_OK)!=0);
+		
+		FILE *fd=NULL;
+		fd=fopen("/tmp/aplist.txt","r");
+
+		while(fd==NULL){
+			sleep(1);
+			fd=fopen("/tmp/aplist.txt","r");
+		}
+		int read_len=0;
+		int write_len=0;
+		char fileBuf[BUF_LEN]={0};
+		//while(!feof(fd)){
+
+			fseek(fd,0L,SEEK_END);
+			int len=ftell(fd);
+			rewind(fd);
+			read_len = fread(fileBuf,1,len,fd);
+			p_debug("len=%d",len);
+			if(read_len <= 0)
+			{	
+				p_debug("fread error,read_len = %d,errno = %d",read_len,errno);
+				fclose(fd);
+				p_debug("leave getScan");
+				return 0;
+			}		
+			strcpy(retstr,fileBuf);
+			p_debug("ret=%s",retstr);/*
+			write_len=fwrite(fileBuf,read_len,1,stdout);
+			if(write_len==0)
+			{	
+				fflush(stdout);
+				fclose(fd);
+				p_debug("write error");
+				return;
+			}
+	 		fflush(stdout);
+			fclose(fd);
+			p_debug("write done");
+			*/
+		//}
+		p_debug("leave getScan");
+		return 0;
+		
+	}
+	
+/*	
 	strcpy(uci_option_str,"powertools.@system[0].mode"); 
 	uci_get_option_value(uci_option_str,mode);
 	memset(uci_option_str,'\0',64);
@@ -877,12 +950,16 @@ int getScan(xmlNodePtr tag, char *retstr)
 	strcpy(uci_option_str,"wireless.@wifi-iface[1].disabled"); 
 	uci_get_option_value(uci_option_str,wlan1_disabled);
 	memset(uci_option_str,'\0',64);
-	
+
+	strcpy(uci_option_str,"wireless.@wifi-iface[1].disabled"); 
+	uci_get_option_value(uci_option_str,wlan1_disabled);
+	memset(uci_option_str,'\0',64);
+
 	if( !strcmp(mode,"2") )
 	{
 		//return 1;
 		;
-	}
+	}*/	
 /*	
 	if( !strcmp(wlan1_disabled,"1") )
 	{
@@ -1082,7 +1159,19 @@ int getStorage(xmlNodePtr tag, char *retstr)
 	      }
 	      strcat(retstr,tmpstr);
 	      memset(tmpstr,0,128);
-	      
+
+		//cgi_log(mount_entry->mnt_opts);
+		  if(strstr(mount_entry->mnt_opts,"rw")){
+			  sprintf(tmpstr," rw=\"%s\"","rw");
+			  strcat(retstr,tmpstr);
+	      	  memset(tmpstr,0,128);
+		  }else{
+			  sprintf(tmpstr," rw=\"%s\"","ro");
+			  strcat(retstr,tmpstr);
+			  memset(tmpstr,0,128);
+
+		  }
+		  
 	      char s1[20];
 	      char s2[20];
 	      char s3[20];
@@ -1090,10 +1179,13 @@ int getStorage(xmlNodePtr tag, char *retstr)
 	      strcpy(s1, kscale(fs.f_blocks, fs.f_bsize));
 	      strcpy(s2, kscale(fs.f_blocks - fs.f_bfree, fs.f_bsize));
 	      strcpy(s3, kscale(fs.f_bavail, fs.f_bsize));
-	      sprintf(tmpstr," total=\"%s\" used=\"%s\" free=\"%s\" fstype=\"%s\" ></Section>",
+	      sprintf(tmpstr," total=\"%s\" used=\"%s\" free=\"%s\" total_byte=\"%lld\" used_byte=\"%lld\" free_byte=\"%lld\" fstype=\"%s\" ></Section>",
 	          s1,
 	          s2,
 	          s3,
+			  (unsigned long long)(fs.f_blocks*(unsigned long long)fs.f_bsize),
+			  (unsigned long long)((fs.f_blocks - fs.f_bfree)* (unsigned long long)fs.f_bsize),
+			  (unsigned long long)(fs.f_bavail*(unsigned long long)fs.f_bsize),
 	          human_fstype(fs.f_type)
 	          );
 	      strcat(retstr,tmpstr);
@@ -1281,20 +1373,59 @@ int getJoinWired(xmlNodePtr tag, char *retstr)
 
 int getVersion(xmlNodePtr tag, char *retstr)
 {
-	char *version=get_conf_str("fw_version");
+	// DM_CONF_FILE
+	char      line[FILENAME_MAX],var[sizeof(line)], val[sizeof(line)];
+	const char    *arg;
+	char fw_ver_num[32]="\0";
+	char fw_ver_num_tmp[32]="\0";
+  	size_t      i;
+  	FILE      *fp;
+  	char *p = NULL;
+  	char *version=get_conf_str("fw_version");
 	int cfg_ret = 0;
 	char version_flag[32] = "\0";
+  	if ((fp = fopen(DM_CONF_FILE, "r")) != NULL)
+  	{
+  		while (fgets(line, sizeof(line), fp) != NULL) 
+  		{
+  			/* Skip comments and empty lines */
+      		if (line[0] == '#' || line[0] == '\n')
+        		continue;
+        	/* Trim trailing newline character */
+      		line[strlen(line) - 1] = '\0';
+      		if (sscanf(line, "%s %[^#\n]", var, val) == 2)
+      		{
+      			
+      			if(strcmp(var ,"airdisk_pro_fw_version")==0)
+      			{	
+      				strncpy(fw_ver_num,val,strlen(val));
+      				fclose(fp);
+      				break;
+      			}
+      		}
+
+  		}
+  	}
 	if(!version)
 		return 0;
 	cfg_ret = get_cfg_str("version_flag",version_flag);
 	if( (cfg_ret == 0) || (strcmp(version_flag,"1") == 0))
-	{
-		sprintf(retstr,"<Version fw1=\"%s\" fw2=\"%s-%s\"></Version>",FW_1,FW_3,version);
+	{//not final version
+		// sprintf(retstr,"<Version fw1=\"%s\" fw2=\"%s-%s\"></Version>",FW_1,FW_3,version);
+		strcpy(fw_ver_num_tmp, fw_ver_num);
 	}
 	else
-	{
-		sprintf(retstr,"<Version fw1=\"%s\" fw2=\"%s-%s\"></Version>",FW_1,FW_2,version);
+	{//final version
+		// sprintf(retstr,"<Version fw1=\"%s\" fw2=\"%s-%s\"></Version>",FW_1,FW_2,version);
+		p = strrchr(fw_ver_num, '.');
+		if(NULL != p){
+      		memcpy(fw_ver_num_tmp, fw_ver_num, p-fw_ver_num);
+   	 	}
+    	else{
+      		strcpy(fw_ver_num_tmp, fw_ver_num);
+    	}
 	}
+	sprintf(retstr,"<Version fw1=\"%s\" fw2=\"%s-%s\"></Version>",FW_1,fw_ver_num_tmp,version);
 	free(version);
 	return 0;
 }
@@ -1923,6 +2054,8 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 	strcpy(str_sp,"wireless.@wifi-iface[1].disabled=0");
 	uci_set_option_value(str_sp);
 	memset(str_sp,0,64);
+	system("nor set client_disabled=0");
+	
 	
 	ttag = strstr(tag, JoinWireless_SET_AP);
 
@@ -2013,10 +2146,11 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 				// free(ntmp);
 				pxml=NULL;
 				// ntmp=NULL;
+				//printstr(password);
 			}
 		}
 	}
-	printstr(password);
+	
 		//strcpy(password,xmlGetProp(tag->children,(const xmlChar*)JoinWireless_SET_AP_password));
 	if( !strcmp(encrypt,"WPA-PSK") || !strcmp(encrypt,"WPA2-PSK") || !strcmp(encrypt,"WPA/WPA2-PSK") )
 	{
@@ -2213,111 +2347,9 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 
 	}
 #endif
-
-
-	wifilist_t *wifilist;
-
-	int iwifimode=get_wifi_mode();
+	system("uci commit");
 	
-	int wifinumber=0;
-	wifilist=get_wifi_list(iwifimode,&wifinumber);
-
-	int i=0;
-	int flag=0;
-
-
-	
-	
-	
-	
-	for(i=0;i<wifinumber;i++)
-	{
-		if( !memcmp( (wifilist+i)->ssid, ssid_str ,strlen(ssid_str)) )
-		{
-			
-			flag=1;
-			break;
-		}
-	}
-	
-	// sprintf(str_sp,"flag=%d",flag);
-	// printstr(str_sp);
-	// memset(str_sp,0,64);
-
-	// sprintf(str_sp,"iwifimode=%d",iwifimode);
-	// printstr(str_sp);
-	// memset(str_sp,0,64);
-
-	if(flag)
-	{
-		sprintf(str_sp,"uci set wifilist.@wifi%dg[%d].ssid='%s'",iwifimode,i,ssid_str);
-		//uci_set_option_value(str_sp);
-		system(str_sp);
-		memset(str_sp,0,64);
-
-		if(!memcmp(encrypt_config,"none",4) || !memcmp(encrypt_config,"wep",3))
-		{
-			sprintf(str_sp,"uci set wifilist.@wifi%dg[%d].encryption=%s",iwifimode,i,encrypt_config);
-		}
-		else
-		{
-			sprintf(str_sp,"uci set wifilist.@wifi%dg[%d].encryption=%s+%s",iwifimode,i,encrypt_config,tkip_aes_config);
-		}
-		//uci_set_option_value(str_sp);
-		system(str_sp);
-		memset(str_sp,0,64);
-		if(memcmp(encrypt_config,"none",4)!=0)
-		{
-			sprintf(str_sp,"uci set wifilist.@wifi%dg[%d].key='%s'",iwifimode,i,password);
-		}
-		//uci_set_option_value(str_sp);
-		system(str_sp);
-		memset(str_sp,0,64);
-		sprintf(str_sp,"uci set wifilist.@wifi%dg[%d].bssid=%s",iwifimode,i,macaddr);
-		//uci_set_option_value(str_sp);
-		system(str_sp);
-		memset(str_sp,0,64);
-		system("uci commit wifilist");
-
-	
-	}
-	else
-	{
-		sprintf(str_sp,"uci add wifilist wifi%dg",iwifimode);
-		system(str_sp);
-		memset(str_sp,0,64);
-		sprintf(str_sp,"uci set wifilist.@wifi%dg[-1].ssid='%s'",iwifimode,ssid_str);
-		system(str_sp);
-		memset(str_sp,0,64);
-		sprintf(str_sp,"uci set wifilist.@wifi%dg[-1].bssid='%s'",iwifimode,macaddr);
-		system(str_sp);
-		memset(str_sp,0,64);
-		if(!strcmp(encrypt_config,"none") || !strcmp(encrypt_config,"wep"))
-		{
-			sprintf(str_sp,"uci set wifilist.@wifi%dg[-1].encryption=%s",iwifimode,encrypt_config);
-		}
-		else
-		{
-			sprintf(str_sp,"uci set wifilist.@wifi%dg[-1].encryption=%s+%s",iwifimode,encrypt_config,tkip_aes_config);
-		}
-		system(str_sp);
-		memset(str_sp,0,64);
-		if(strcmp(encrypt_config,"none")!=0)
-		{
-			sprintf(str_sp,"uci set wifilist.@wifi%dg[-1].key='%s'",iwifimode,password);
-		}
-		system(str_sp);
-		memset(str_sp,0,64);
-		sprintf(str_sp,"uci set wifilist.number%dg.num=%d",iwifimode,wifinumber+1);
-		system(str_sp);
-		memset(str_sp,0,64);
-
-		system("uci commit wifilist");
-
-
-	}
-	system("cp -f /etc/config/wifilist /user/wifilist");
-
+	system("control_dns.sh >/dev/null 2>&1 &");
 	
 	free(name);
 	free(encrypt);
@@ -2326,34 +2358,12 @@ int setJoinWireless(xmlNodePtr tag, char *retstr)  //wlan1 disabled=0;network re
 	free(channel);
 	free(pxml);
 
-	free(wifilist);
 
 	// system("uci set network.wan.workmode=1");
 	// system("brctl addif br-lan eth0");
-	system("uci commit");
 	
-	
-	//system("/etc/init.d/network restart");
-	
-	//system("wifi down >/dev/null 2>&1");
-	//if(cur_mode[0]!= '1')
-// 	if(strcmp(WiredMode,"dhcp"))
-// 	{
-// 	//	
-// 		system("sync");
-// 		sleep(1);
-// 	//	system("reboot");
-// 		system("ifup wan");
-// //		system("/etc/init.d/network restart");
-// 	}
-// 	else
-	system("touch /tmp/wifi_client_is_connecting");
-	// system("wifi >/dev/null 2>&1");
-	// sleep(5);
-	//system("set_client.sh >/dev/null 2>&1 &");
-	system("control_dns.sh >/dev/null 2>&1 &");
-	system("rm -f /tmp/wifi_client_is_connecting");
-	
+	system("save_wifi &");
+
 	return 0;
 }
 int setJoinWired(xmlNodePtr tag, char *retstr)  //wlan1 disabled=1;network restart
@@ -2430,7 +2440,7 @@ int setJoinWired(xmlNodePtr tag, char *retstr)  //wlan1 disabled=1;network resta
 			system("uci set network.wan.workmode=0");
 			system("uci commit");
 			system("brctl delif br-lan eth0");
-			system("ifconfig wlan1 down");
+			system("ifconfig wlan0 down");
 			system("killall udhcpc >/dev/null 2>&1");
 			system("udhcpc -t 0 -i eth0  -b -p /var/run/dhcp-eth0.pid -O rootpath -R >/dev/null &");
 			goto quit;
@@ -3190,11 +3200,6 @@ int TimeSync(xmlNodePtr tag, char *retstr)
 		time_tm.tm_yday = 0;
 		time_tm.tm_isdst = 0;
 		
-		timep = mktime(&time_tm);
-		time_tv.tv_sec = timep;
-		time_tv.tv_usec = 0;
-		time_tz.tz_dsttime=0;
-		
 		zone_tmp=zone;
 		memcpy(zone_str,zone_tmp,3);
 		zone_tmp+=3;
@@ -3217,8 +3222,7 @@ int TimeSync(xmlNodePtr tag, char *retstr)
 			time_tz.tz_minuteswest=hour*60+minutes;
 			time_tz.tz_minuteswest=-time_tz.tz_minuteswest;
 		}
-		
-		
+				
 		if(strcmp(zone_cur,zone_str)!=0)
 		{
 			sprintf(str_sp,"system.@system[0].timezone=%s",zone_str);
@@ -3228,12 +3232,18 @@ int TimeSync(xmlNodePtr tag, char *retstr)
 			system(str_sp);
 			memset(str_sp,0,64);
 		}
+		system("uci commit");
+
+		timep = mktime(&time_tm);
+		time_tv.tv_sec = timep;
+		time_tv.tv_usec = 0;
+		time_tz.tz_dsttime=0;
+				
 		settimeofday(&time_tv, &time_tz);
-		
 	}
 	
 	
-	system("uci commit");
+	//system("uci commit");
 	
 	free(value);
 	free(zone);
@@ -3279,7 +3289,7 @@ int setClient(xmlNodePtr tag, char *retstr)
 			strcpy(enable_config,"0");
 			//strcpy(htmode,"HT20");
 			if(shutdown_client_in_system)
-				system("ifconfig wlan1 up");
+				system("ifconfig wlan0 up");
 		}
 		else if(!strcmp(enable,"OFF"))
 		{
@@ -3287,7 +3297,7 @@ int setClient(xmlNodePtr tag, char *retstr)
 			strcpy(enable_config,"1");
 			//strcpy(htmode,"HT40+");
 			system("touch /tmp/shutdown_client_in_system");
-			system("ifconfig wlan1 down");
+			system("ifconfig wlan0 down");
 			//system("touch /tmp/manul_shutdown_client");
 		}
 		

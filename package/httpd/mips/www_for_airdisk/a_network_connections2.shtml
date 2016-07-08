@@ -329,7 +329,7 @@
                 }
             });
             //bugcode
-            Loading(message[currentlang].connecting + ap["@name"] + "...", 20, function () {                
+            Loading(message[currentlang].connecting + ap["@name"] + "...", 30, function () {                
                 $.get(appendTS(api.apiurl), { data: api.currentap }, function (result) {
                     var result = $.xml2json(result);
                     Loaded();

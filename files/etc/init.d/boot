@@ -18,6 +18,9 @@ uci_apply_defaults() {
 }
 
 boot() {
+	. /lib/netifd/cfg_set.sh
+	. /lib/netifd/load_wifi_module.sh
+
 	[ -f /proc/mounts ] || /sbin/mount_root
 	[ -f /proc/jffs2_bbc ] && echo "S" > /proc/jffs2_bbc
 	[ -f /proc/net/vlan/config ] && vconfig set_name_type DEV_PLUS_VID_NO_PAD
@@ -35,8 +38,21 @@ boot() {
 	grep -q debugfs /proc/filesystems && /bin/mount -o noatime -t debugfs debugfs /sys/kernel/debug
 	[ "$FAILSAFE" = "true" ] && touch /tmp/.failsafe
 
+	
+
+	mkdir -p /factory
+#	mkdir -p /user
+
+	mount -t ext4 /dev/mmcblk0p3 /factory
+#	mount -t ext4 /dev/mmcblk0p3 /user
+	
+	factory_user_set
+#	mp_disk write
+
 #	echo /dev/mmcblk0p4 >/sys/devices/platform/jz-dwc2/dwc2/gadget/gadget-lun0/file
 	insmod /lib/modules/3.0.8/g_file_storage.ko stall=0 file=/dev/mmcblk0p4 removable=1
+
+#	load_wifi_module
 	
 #	[ -d /mnt/cfg ] || mkdir -p /mnt/cfg
 #	[ -d /mnt/user ] || mkdir -p /mnt/user
@@ -46,13 +62,13 @@ boot() {
 	/sbin/kmodloader
 
 	# allow wifi modules time to settle
-	sleep 1
+#	sleep 1
 
-	/sbin/wifi detect > /tmp/wireless.tmp
-	[ -s /tmp/wireless.tmp ] && {
-		cat /tmp/wireless.tmp >> /etc/config/wireless
-	}
-	rm -f /tmp/wireless.tmp
+#	/sbin/wifi detect > /tmp/wireless.tmp
+#	[ -s /tmp/wireless.tmp ] && {
+#		cat /tmp/wireless.tmp >> /etc/config/wireless
+#	}
+#	rm -f /tmp/wireless.tmp
 
 	uci_apply_defaults
 	

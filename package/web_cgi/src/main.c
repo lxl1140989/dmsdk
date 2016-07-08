@@ -251,7 +251,7 @@ main_error:
 	freeCgiStr();
 	//xmlFreeDoc(doc);
 	
-	uci_free_context(ctx);
+	//uci_free_context(ctx);
 }
 
 

@@ -13,5 +13,3 @@ config timeserver ntp
 config mpset
 	option status 0
 
-config upgrade
-	option status 0

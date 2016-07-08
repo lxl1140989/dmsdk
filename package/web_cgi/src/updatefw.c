@@ -107,7 +107,7 @@ int check_fw_file()
 				fclose(fw_fp);
 				
 				memset(cmd,0,sizeof(cmd));
-				sprintf(cmd,"cp %s/'$$update$$.bin' /tmp/fwupgrade.gz",dir);
+				sprintf(cmd,"cp %s/'$$update$$.bin' /tmp/fwupgrade.tar.gz",dir);
 				system(cmd);
 
 				memset(cmd,0,sizeof(cmd));
@@ -145,6 +145,10 @@ int main(int argc, char const *argv[])
 
 	char cmd_line[128]="\0";
 	char model_name_str[32]="\0";
+	char line_buff[256]="\0";
+	char md5_str1[40]="\0";
+	char md5_str2[40]="\0";
+	
 	memset(path,0,sizeof(path));
 	
 	memset(updatefw,0,sizeof(updatefw));
@@ -166,7 +170,8 @@ int main(int argc, char const *argv[])
 		goto exit;
 	}
 
-	system("gzip -d /tmp/fwupgrade.gz");
+	system("tar -zxf /tmp/fwupgrade.tar.gz -C /tmp");
+	system("mv /tmp/6291-update-fw.bin /tmp/fwupgrade");
 	fw_fp=fopen("/tmp/fwupgrade","rb");
 	if(fw_fp==NULL)
 		goto exit;
@@ -177,31 +182,42 @@ int main(int argc, char const *argv[])
 	{
 		return -1;
 	}
+	system("md5sum /tmp/fwupgrade >/tmp/fwupgrade.md5");
 
-	system("ifconfig wlan0 down");
-	system("/etc/init.d/samba stop");
-	system("killall uart_server");
-	system("killall dnsmasq");
-	system("killall wpa_supplicant");
-	system("killall udhcpc");
-	system("killall ushare");
-	system("killall check_shair.sh");
-	system("killall newshair");
-	system("killall avahi-publish-service");
-	system("killall check_reset");
-	system("/etc/init.d/dm_router stop");
+	if( (fw_fp=fopen("/tmp/6291-update-fw.bin.md5","rb"))==NULL)
+	{
+		system("rm -f /tmp/6291-update-fw.bin.md5");
+		return 1;
+	}
+	fgets(line_buff,256,fw_fp);
+	char *p_stok_line=line_buff;
+	char *p_stok_md5=NULL;
+	p_stok_md5=strtok(p_stok_line, " ");
+	strcpy(md5_str1,p_stok_md5);
+	printf("md5_str1 : %s\n", md5_str1);
+	fclose(fw_fp);
+	memset(line_buff,0,256);
+
+	if( (fw_fp=fopen("/tmp/fwupgrade.md5","rb"))==NULL)
+	{
+		system("rm -f /tmp/fwupgrade.md5");
+		return 1;
+	}
+	fgets(line_buff,256,fw_fp);
+	p_stok_line=line_buff;
+	p_stok_md5=strtok(p_stok_line, " ");
+	strcpy(md5_str2,p_stok_md5);
+	printf("md5_str2 : %s\n", md5_str2);
+	fclose(fw_fp);
+	if(strcmp(md5_str1,md5_str2)!=0)
+	{
+		return 1;
+	}
+	system("sync");
+	system("echo 3 >/proc/sys/vm/drop_caches");
+	system("sysupgrade /tmp/fwupgrade &");
 	
 
-	system("echo 3 >/proc/sys/vm/drop_caches");
-	system("echo none > /sys/class/leds/longsys\:green\:led/trigger");
-	system("echo timer > /sys/class/leds/longsys\:blue\:led/trigger");
-	system("dd if=/tmp/fwupgrade of=/dev/mmcblk0 bs=1M count=5 seek=3");
-	system("sync");
-	system("dd if=/tmp/fwupgrade of=/dev/mmcblk0 bs=1M skip=5 seek=8");
-	system("sync");
-
-	system("echo none > /sys/class/leds/longsys\:green\:led/trigger");
-	system("echo none > /sys/class/leds/longsys\:blue\:led/trigger");
 #if 0
 	system("ifdown -a");
 	system("killall perl");

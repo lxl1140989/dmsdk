@@ -5,7 +5,7 @@
 
 #define Debug_cfg 0
 
-#define USERCONFIGPATH "/user/"
+#define USERCONFIGPATH "/factory/"
 #define DATA_LEN		256
 
 int nor_set(char *str_name,unsigned char *value);
