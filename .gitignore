@@ -1,5 +1,7 @@
 .svn
 project/
 dl/
+staging_dir/
+tmp/
 package/dm_router/
 uboot/u-boot/
