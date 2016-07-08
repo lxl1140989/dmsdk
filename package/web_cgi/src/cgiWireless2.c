@@ -268,7 +268,8 @@ void formatScanStr(char *outstr)
 
 	
 	//strcat(outstr, "mac=\"");
-	//strcat(outstr, macaddr);
+	strcat(outstr, macaddr);
+	strcat(outstr, ",");
 	//strcat(outstr, "\" ");
 
 	//strcat(outstr, "channel=\"");

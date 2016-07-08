@@ -1,5 +1,7 @@
 #include <unistd.h> 
-#include <stdio.h> 
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <stdlib.h>             
@@ -151,6 +153,9 @@ int main()
 	int tail_count=0;
 	int true_len=0;
 	int i;
+	char line_buff[256]="\0";
+	char md5_str1[40]="\0";
+	char md5_str2[40]="\0";
 	
 	fprintf(stdout,"Content-type:text/html\r\n\r\n");
 	//fprintf(stdout,"nidaye");
@@ -267,17 +272,19 @@ int main()
 	fclose(fw_fp);
 	logstr("\ndone");
 
-	system("mv /tmp/fwupgrade /tmp/fwupgrade.gz");
-	system("gzip -d /tmp/fwupgrade.gz");
+	// system("mv /tmp/fwupgrade /tmp/fwupgrade.gz");
+	// system("gzip -d /tmp/fwupgrade.gz");
 	if( (fw_fp=fopen(FW_FILE,"rb"))==NULL)
 	{
 		system("rm -f /tmp/fwupgrade.gz");
 		return 1;
+		
 	}
 	fseek(fw_fp,0x20,SEEK_SET);
 	fread(op_fw_header,1,32,fw_fp);
 	fclose(fw_fp);
 
+	
 	if(strcmp(op_fw_header,MODEL_NAME)!=0){
 		memset(tmp, 0, 64);
 		sprintf(tmp, "op_fw_header = %s, MODEL_NAME = %s\n", op_fw_header, MODEL_NAME);

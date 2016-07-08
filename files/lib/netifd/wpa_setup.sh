@@ -33,6 +33,7 @@ wpa_supplicant_generate_conf() {
 	_wpa_supplicant_common "$1"
 	local ssid=$(uci get wireless.@wifi-iface[1].ssid)
 	local key=$(uci get wireless.@wifi-iface[1].key)
+	local bssid=$(uci get wireless.@wifi-iface[1].bssid)
 
 	local key_mgmt='NONE'
 	local enc_str=
@@ -69,6 +70,7 @@ wpa_supplicant_generate_conf() {
 network={
 	scan_ssid=$scan_ssid
 	ssid="$ssid"
+	bssid=$bssid
 	key_mgmt=$key_mgmt
 	$network_data
 }

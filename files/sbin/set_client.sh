@@ -18,7 +18,7 @@ fi
 #fi
 #ifconfig wl0.1 $lan_ip up
 
-#/etc/init.d/dnsmasq stop
+#killall dnsmasq
 #dnsmasq -C /etc/dnsmasq/dnsmasq.conf -k &
 
 #iptables -t nat -A POSTROUTING -s 192.168.222.0/24 -o wlan0 -j MASQUERADE
@@ -29,6 +29,6 @@ killall wpa_supplicant
 killall udhcpc
 start_wpa_supplicant
 
-udhcpc -b -t 0 -i wlan0 -s /etc/udhcpc.script
+udhcpc -b -t 0 -i wlan0 -s /etc/udhcpc.script &
 
 

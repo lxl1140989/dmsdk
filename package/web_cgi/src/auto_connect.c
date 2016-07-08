@@ -34,6 +34,25 @@ int get_wifi_mode()
 		return M_5G;
 }
 
+void formatMac(char *destMac, char *sourMac)
+{
+	int i = 0;
+	char *p_dest = destMac,*p_sour = sourMac;
+	for(i = 1; i<=17; i++){
+		if(i%3 == 0){
+			*p_dest = ':';
+			p_dest++;
+		}
+		else{
+			*p_dest = *p_sour;
+			p_dest++;
+			p_sour++;
+		}
+	}
+	return ;
+}
+
+
 scan_list_t *read_scanlist_to_buff(char *scan_list_str,int *scan_num,int wifimode)
 {
 	int list_len;
@@ -65,6 +84,7 @@ scan_list_t *read_scanlist_to_buff(char *scan_list_str,int *scan_num,int wifimod
 	char singlelist[128]="\0";
 	char *psinglelist;
 	char *p_stok_ssid;
+	char *p_stok_mac;
 	char *p_stok_channel;
 	char *p_stok_rssi;
 
@@ -76,18 +96,18 @@ scan_list_t *read_scanlist_to_buff(char *scan_list_str,int *scan_num,int wifimod
 			memcpy(singlelist,p1,p2-p1);
 			psinglelist=singlelist;
 			p_stok_ssid = strtok(psinglelist, ",");
+			p_stok_mac = strtok(NULL, ",");
 			//strcpy( (scan_list+i)->ssid,p_stok);
-
 			p_stok_channel = strtok(NULL, ","); 
 			//(scan_list+i)->channel=atoi(p_stok);
 			p_stok_rssi = strtok(NULL, ",");
 			//(scan_list+i)->rssi=atoi(p_stok);
-			
 			if(wifimode==M_2G)
 			{
 				if( atoi(p_stok_channel) <36 )  //2.4G
 				{
 					strcpy( (scan_list+i)->ssid,p_stok_ssid);
+					formatMac((scan_list+i)->mac, p_stok_mac);
 					(scan_list+i)->channel=atoi(p_stok_channel);
 					(scan_list+i)->rssi=atoi(p_stok_rssi);
 					i++;
@@ -112,9 +132,6 @@ scan_list_t *read_scanlist_to_buff(char *scan_list_str,int *scan_num,int wifimod
 				}
 			}
 
-
-
-
 			p1=p2+1;
 			// i++;
 			memset(singlelist,0,sizeof(singlelist));
@@ -123,10 +140,10 @@ scan_list_t *read_scanlist_to_buff(char *scan_list_str,int *scan_num,int wifimod
 	}
 
 	for(i=0;i<apnum;i++)
-		d_printf("%s %d %d\n", (scan_list+i)->ssid,(scan_list+i)->channel,(scan_list+i)->rssi);
+		d_printf("%s %s %d %d\n", (scan_list+i)->ssid, (scan_list+i)->mac,(scan_list+i)->channel,(scan_list+i)->rssi);
 
 	*scan_num=apnum;
-
+	
 	return scan_list;
 
 }
@@ -148,16 +165,19 @@ int scan_list_sequence(scan_list_t *scan_list,int num)
 			{
 				memset(&swap_list,0,sizeof(scan_list_t));
 				memcpy(swap_list.ssid,(scan_list+i)->ssid,sizeof(swap_list.ssid));
+				memcpy(swap_list.mac,(scan_list+i)->mac,sizeof(swap_list.mac));
 				swap_list.channel=(scan_list+i)->channel;
 				swap_list.rssi=(scan_list+i)->rssi;
 
 				memset((scan_list+i)->ssid,0,sizeof(swap_list.ssid));
 				memcpy((scan_list+i)->ssid,(scan_list+i+1)->ssid,sizeof(swap_list.ssid));
+				memcpy((scan_list+i)->mac,(scan_list+i+1)->mac,sizeof(swap_list.mac));
 				(scan_list+i)->channel=(scan_list+i+1)->channel;
 				(scan_list+i)->rssi=(scan_list+i+1)->rssi;
 
 				memset((scan_list+i+1)->ssid,0,sizeof(swap_list.ssid));
 				memcpy((scan_list+i+1)->ssid,swap_list.ssid,sizeof(swap_list.ssid));
+				memcpy((scan_list+i+1)->mac,swap_list.mac,sizeof(swap_list.mac));
 				(scan_list+i+1)->channel=swap_list.channel;
 				(scan_list+i+1)->rssi=swap_list.rssi;
 
@@ -292,7 +312,7 @@ int main()
 	}
 
 	uci_free_context(ctx);
-	
+
 	for(i=0;i<wifi_num;i++)
 	{
 		for(j=0;j<scan_ap_num;j++)
@@ -302,7 +322,9 @@ int main()
 				sprintf(uci_set_str,"uci set wireless.@wifi-iface[1].ssid='%s'",(s_wifi_list+i)->ssid);
 				system(uci_set_str);
 				memset(uci_set_str,0,sizeof(uci_set_str));
-				sprintf(uci_set_str,"uci set wireless.@wifi-iface[1].bssid='%s'",(s_wifi_list+i)->mac);
+				//sprintf(uci_set_str,"uci set wireless.@wifi-iface[1].bssid='%s'",(s_wifi_list+i)->mac);
+				//some ssid have diffrent mac
+				sprintf(uci_set_str,"uci set wireless.@wifi-iface[1].bssid='%s'",(s_scan_list+j)->mac);
 				system(uci_set_str);
 				memset(uci_set_str,0,sizeof(uci_set_str));
 				sprintf(uci_set_str,"uci set wireless.@wifi-iface[1].encryption='%s'",(s_wifi_list+i)->encryption);
@@ -318,11 +340,10 @@ int main()
 				
 				flag=1;
 				break;
-				
 			}
-			if(flag==1)
-				break;
 		}
+		if(flag==1)
+			break;
 	}
 	if(flag==1)
 	{

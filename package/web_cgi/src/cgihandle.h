@@ -35,7 +35,7 @@ extern char error_info[1024];
 
 #define FW_1 "1.0.1"
 #define FW_2 "1.2.04"
-#define FW_3 "1.2.04.8"
+#define FW_3 "1.2.04.16"
 
 
 //function str

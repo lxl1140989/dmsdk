@@ -68,6 +68,13 @@ define Package/web_cgi/install
 #	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ctl_wifi_for_3_0 $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/auto_connect $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mp_disk $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/save_wifi $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/nvram_cfg $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/erase_boot_flag $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/set_wifimode_to_boot $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/sys_upgrade $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/set_sys_flag $(1)/usr/sbin/
+
 	$(INSTALL_BIN) ./nrender/config_nrender $(1)/bin/
 	$(INSTALL_BIN) ./nrender/restore_factory_from_cfg $(1)/bin/
 	$(INSTALL_BIN) ./nrender/restore_single_param $(1)/bin/

@@ -6,6 +6,7 @@
 #
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
+PRODUCT_MODEL=nw5025F_ac
 
 JFFS2_BLOCKSIZE=32k 512k
 
@@ -27,39 +28,45 @@ endef
 define MkImageGzip
 	gzip -9 -c $(1) > $(1).gz
 	mkimage -A mips -O linux -T kernel -a 0x80010000 -C gzip \
-		-e $(call kernel_entry,$(KDIR)/vmlinux.debug) -n 'MIPS OpenWrt Linux-$(LINUX_VERSION)' \
+		-e $(call kernel_entry,$(KDIR)/vmlinux.debug) -n '$(PRODUCT_MODEL)' \
 		-d $(1).gz $(2)
+endef
+
+define MkImageLzma
+	lzma e $(1) -lc1 -lp2 -pb2 $(1).lzma
+	mkimage -A mips -O linux -T kernel -a 0x80010000 -C lzma \
+		-e $(call kernel_entry,$(KDIR)/vmlinux.debug) -n '$(PRODUCT_MODEL)' \
+		-d $(1).lzma $(2)
 endef
 
 define Image/BuildKernel
 	$(call MkImageGzip,$(KDIR)/vmlinux,$(UIMAGE))
+	$(call MkImageLzma,$(KDIR)/vmlinux,$(UIMAGE).lzma)
 endef
 
 define Image/Build/squashfs
 	$(call prepare_generic_squashfs,$(KDIR)/root.squashfs)
 endef
 
+
+NOR_16MB=6291-nor-16MB.bin
+NOR_UPDATE_FW=6291-nor-update-fw.bin
 define Image/Build
-	dd if=$(KDIR)/root.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-root.$(1) bs=128k conv=sync
-ifeq ($(1),ext4)
-	dd if=$(KDIR)/factory.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-factory.$(1) bs=128k conv=sync
-	dd if=$(KDIR)/user.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-user.$(1) bs=128k conv=sync
-#	dd if=$(KDIR)/empty.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-empty.$(1) bs=128k conv=sync
-	
-	-rm -f $(BIN_DIR)/6291-update-fw.bin $(BIN_DIR)/6291-update-fw-gz.bin
-	
-	tr '\000' '\377' < /dev/zero | dd of=$(BIN_DIR)/kernel-5MB-0xff.bin bs=1024 count=5120 status=noxfer
-	dd if=$(UIMAGE) of=$(BIN_DIR)/kernel-5MB-0xff.bin conv=notrunc status=noxfer
 
-	cat $(BIN_DIR)/kernel-5MB-0xff.bin $(BIN_DIR)/$(IMG_PREFIX)-root.$(1) >$(BIN_DIR)/6291-update-fw.bin
-
-	gzip -9 -c $(BIN_DIR)/6291-update-fw.bin > $(BIN_DIR)/6291-update-fw-gz.bin
-
-	rm -f $(BIN_DIR)/kernel-5MB-0xff.bin
-
-
-
+ifeq ($(1),squashfs)
+	$(STAGING_DIR_HOST)/bin/padjffs2 $(KDIR)/root.squashfs 32
 endif
+	dd if=$(KDIR)/root.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-root.$(1) bs=128k conv=sync
+ifeq ($(1),squashfs)
+	tr '\000' '\377' < /dev/zero | dd of=$(BIN_DIR)/$(NOR_16MB) bs=1024 count=16384 status=noxfer
+	dd if=$(TOPDIR)/uboot/uboot-6291-norboot.bin of=$(BIN_DIR)/$(NOR_16MB) conv=notrunc status=noxfer
+	dd if=$(BIN_DIR)/$(IMG_PREFIX)-uImage.bin.lzma of=$(BIN_DIR)/$(NOR_16MB) bs=1024 seek=256 conv=notrunc status=noxfer
+	dd if=$(BIN_DIR)/$(IMG_PREFIX)-root.$(1) of=$(BIN_DIR)/$(NOR_16MB) bs=1024 seek=2304 conv=notrunc status=noxfer
+	tr '\000' '\377' < /dev/zero | dd of=$(BIN_DIR)/$(NOR_UPDATE_FW) bs=1024 count=10240 status=noxfer
+	dd if=$(BIN_DIR)/$(IMG_PREFIX)-uImage.bin.lzma of=$(BIN_DIR)/$(NOR_UPDATE_FW) conv=notrunc status=noxfer
+	dd if=$(BIN_DIR)/$(IMG_PREFIX)-root.$(1) of=$(BIN_DIR)/$(NOR_UPDATE_FW) bs=1M seek=2 conv=notrunc status=noxfer
+endif
+
 endef
 
 $(eval $(call BuildImage))

@@ -20,6 +20,7 @@ typedef struct _scan_list
 	int rssi;
 	int channel;
 	char ssid[64];
+	char mac[32];
 }scan_list_t, *pscan_list_t;
 
 typedef struct _wifilist
