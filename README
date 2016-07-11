@@ -20,3 +20,7 @@ tar -zxvf dl.tar.gz
 cd dmsdk
 make  或者 make V=s (输出编译的详细信息)
 生成的firmware位于 bin/xburst/
+如果编译的是SD boot版本，烧录文件为6291-sd-burn-128MB.img，升级文件为6291-update-fw-gz.bin
+如果编译的是nor flash boot版本，烧录文件为6291-nor-16MB.bin，升级文件为6291-nor-update-fw.bin
+
+详细的使用文档，请前往下面的链接下载。
